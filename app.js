@@ -20,15 +20,6 @@
 
 getCountriesInfo();
 let countryPopu = [];
-window.setTimeout(function() {
-    countryPopu.sort(function(first, second) {
-        return second.total - first.total;
-    });
-    countryPopu = countryPopu.slice(0,5);
-    console.log('sorted: ', countryPopu);
-    insertHtml(countryPopu);
-},3000);
-
 
 function getCountriesInfo(){
     let url = 'https://population.simonsfoundation.org/countries';
@@ -68,32 +59,44 @@ function getCountriesInfo(){
     function getPopulationForShortestName(countries) {
         let promiseQueue = [];
         for (let country of countries) {
-            getPopulationByName(country);
+            promiseQueue.push(getPopulationByName(country));
         }
+
+        Promise.all(promiseQueue).then(data => {
+            countryPopu.sort(function(first, second) {
+                return second.total - first.total;
+            });
+            countryPopu = countryPopu.slice(0,5);
+            console.log('sorted: ', countryPopu);
+            insertHtml(countryPopu);
+        });
 
         function getPopulationByName(country) {
             let baseUrl = 'https://population.simonsfoundation.org/population/2017/';
             let url = baseUrl + country;
             console.log('url: ', url);
 
-            $.ajax({
-                url: url,
-                method: 'GET',
-                success: function(data){
-                    let countryObj = {name: country};
-                    let population = 0;
-                    for (let ele of data) {
-                        if (ele.age === 18) {
-                            countryObj.female18 = ele.females;
-                            countryObj.male18 = ele.males;
+            return new Promise(function(resolve) {
+                $.ajax({
+                    url: url,
+                    method: 'GET',
+                    success: function(data){
+                        let countryObj = {name: country};
+                        let population = 0;
+                        for (let ele of data) {
+                            if (ele.age === 18) {
+                                countryObj.female18 = ele.females;
+                                countryObj.male18 = ele.males;
+                            }
+                            population += ele.total;
                         }
-                        population += ele.total;
-                    }
-                    countryObj.total = population;
-                    console.log(countryObj);
-                    countryPopu.push(countryObj);
-                },
-                dataType: "jsonp"
+                        countryObj.total = population;
+                        console.log(countryObj);
+                        countryPopu.push(countryObj);
+                        resolve(countryObj);
+                    },
+                    dataType: "jsonp"
+                });
             });
         }
     }
