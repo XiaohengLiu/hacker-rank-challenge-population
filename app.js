@@ -18,108 +18,139 @@
 // A sample can be seen below
 // Notice the use of jsonp instead of json for dataType. This is required, as this is how our backend api proxy works
 
-getCountries()
+getCountriesInfo();
 let countryPopu = [];
-let shortestNames = [];
 window.setTimeout(function() {
-    if (countryPopu.length === 0 ) {
-        countryPopu = shortestNames.slice(0,5);
-    }
+    countryPopu.sort(function(first, second) {
+        return second.total - first.total;
+    });
+    countryPopu = countryPopu.slice(0,5);
+    console.log('sorted: ', countryPopu);
     insertHtml(countryPopu);
 },3000);
 
 
-function getCountries(){
-    let apiData = {};
+function getCountriesInfo(){
     let url = 'https://population.simonsfoundation.org/countries';
 
     $.ajax({
         url: url,
         method: 'GET',
         success: function(data){
-            shortestNames = getShortestNames(data.countries);
-            console.log('shortestNames: ', shortestNames);
-            getTopFive(shortestNames);
+            let shortestNames = getShortestNames(data.countries);
+            getPopulationForShortestName(shortestNames);
         },
         dataType: "jsonp"
     });
-}
 
-function getShortestNames(countries) {
-    let minLength = 99;
-    let shortestName = [];
-    for (let country of countries) {
-        minLength = country.length < minLength ? country.length : minLength;
-    }
-    for (let country of countries) {
-        if (country.length === minLength) {
-            shortestName.push(country);
+
+    function getShortestNames(countries) {
+        let minLength = 99;
+        let shortestName = [];
+        for (let country of countries) {
+            minLength = country.length < minLength ? country.length : minLength;
         }
-    }
-    return shortestName;
-}
-
-/*
- * try to use 'promise', and promise.all to do the async, but browser didn't support (Nodejs feature)
- * So used some very ugly way (setTimeout....I know it is very bad...)
- * */
-function getTopFive(countries) {
-    let promises = [];
-    for (let country of countries) {
-        getPopulationForCountry(country);
+        for (let country of countries) {
+            if (country.length === minLength) {
+                shortestName.push(country);
+            }
+        }
+        return shortestName;
     }
 
-    function getPopulationForCountry(country) {
-        //spend too much time figure out why the api didnt work so cannot finish the work.....
-        let baseUrl = 'https://api.population.io:80/1.0/population/2017/';
-        // let baseUrl = 'https://population.simonsfoundation.org/population/2017/';
-        let url = baseUrl + country;
-        console.log('url: ', url);
+    /*
+     * Maybe the best way to do this is to use Javascript Promise module:
+     *   - Promise.all(PROMISE_QUEUE): when everything in the promise queue has return, then start doing something else.
+     *   - but it needs API to return promise.
+     * So I used a nasty way "setTimeout" to wait for all the data ready.
+     * We can also do nested AJAX call
+     */
+    function getPopulationForShortestName(countries) {
+        let promiseQueue = [];
+        for (let country of countries) {
+            getPopulationByName(country);
+        }
 
-        $.ajax({
-            url: url,
-            method: 'GET',
-            /* ------------- Can figure out why no response here, ignored --------------*/
-            success: function(data){
-                console.log('population back: ', data);
-                let population = 0;
-                for (let ele of data) {
-                    population += ele.total;
-                }
-                countryPopu.push({name: country, total: population});
-            },
-            dataType: "jsonp"
-        });
+        function getPopulationByName(country) {
+            let baseUrl = 'https://population.simonsfoundation.org/population/2017/';
+            let url = baseUrl + country;
+            console.log('url: ', url);
+
+            $.ajax({
+                url: url,
+                method: 'GET',
+                success: function(data){
+                    let countryObj = {name: country};
+                    let population = 0;
+                    for (let ele of data) {
+                        if (ele.age === 18) {
+                            countryObj.female18 = ele.females;
+                            countryObj.male18 = ele.males;
+                        }
+                        population += ele.total;
+                    }
+                    countryObj.total = population;
+                    console.log(countryObj);
+                    countryPopu.push(countryObj);
+                },
+                dataType: "jsonp"
+            });
+        }
     }
 }
 
 function insertHtml(array) {
     let myDiv = document.getElementById('app');
-    for (let country of array) {
-        let cur = document.createElement("DIV");
-        cur.className = 'unClick';
-        cur.innerHTML = country;
-        cur.onclick = function(event) {
-            let name = event.target.innerHTML;
-            let baseUrl = 'https://api.population.io:80/1.0/population/2017/18/';
-            let url = baseUrl + name;
-            console.log('getting countries population of age 18: ', url);
+    myDiv.innerHTML = "";
 
-            $.ajax({
-                url: url,
-                method: 'GET',
-                /* ------------- Can figure out why no response here, ignored --------------*/
-                success: function(data){
-                    console.log('age 18 data back: ', data);
-                    let population = 0;
-                    for (let ele of data) {
-                        population += ele.total;
-                    }
-                    countryPopu.push({name: country, total: population});
-                },
-                dataType: "jsonp"
-            });
+    let nameColumn = document.createElement("DIV");
+    nameColumn.className = 'columnTitle';
+    nameColumn.innerHTML = "NAME";
+    myDiv.appendChild(nameColumn);
+
+    let totalColumn = genereateColumnTitle('TOTAL');
+    let maleColumn = genereateColumnTitle("MALE 18")
+    let femaleColumn = genereateColumnTitle("FEMALE 18")
+
+    myDiv.appendChild(totalColumn);
+    myDiv.appendChild(maleColumn);
+    myDiv.appendChild(femaleColumn);
+    myDiv.appendChild(document.createElement("BR"));
+
+    for (let country of array) {
+        let nameDiv = document.createElement("DIV");
+        nameDiv.className = 'notClicked';
+        nameDiv.innerHTML = country.name;
+
+        let populationDiv = genereatePopulationDiv()
+        let femaleDiv = genereatePopulationDiv()
+        let maleDiv = genereatePopulationDiv()
+
+        myDiv.appendChild(nameDiv);
+        myDiv.appendChild(populationDiv);
+        myDiv.appendChild(femaleDiv);
+        myDiv.appendChild(maleDiv);
+        myDiv.appendChild(document.createElement("BR"));
+
+        nameDiv.onclick = function(event) {
+            nameDiv.className = "clicked";
+            populationDiv.innerHTML = country.total;
+            femaleDiv.innerHTML = country.female18;
+            maleDiv.innerHTML = country.male18;
         }
-        myDiv.appendChild(cur);
+    }
+
+    function genereatePopulationDiv() {
+        let result = document.createElement("DIV");
+        result.className = "population";
+        result.innerHTML = "N/A"
+        return result;
+    }
+
+    function genereateColumnTitle(title) {
+        let column = document.createElement("DIV");
+        column.className = 'columnTitle';
+        column.innerHTML = title;
+        return column;
     }
 }

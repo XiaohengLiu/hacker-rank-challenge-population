@@ -1,5 +1,39 @@
-.unClick {
+.title {
+    text-align: center;
+}
+
+.columnTitle {
+    width: 200px;
+    color:black;
+    font-weight:bold;
+    display: inline-block;
+    text-align: center;
+}
+
+.notClicked {
     background-color: blue;
     width: 200px;
     color:white;
+    text-align: center;
+    font-size: 14px;
+    display: inline-block;
+}
+
+.clicked {
+    background-color: red;
+    width: 200px;
+    color:white;
+    text-align: center;
+    font-size: 14px;
+    display: inline-block;
+}
+
+.population {
+    background-color: lightblue;
+    text-align: center;
+    display: inline-block;
+    width: 200px;
+    font-size: 14px;
+    color: black;
+    background-color: white;
 }
